@@ -1,12 +1,13 @@
 """
 ntm.py
-Creates independent computation branches and explores them using DFS.
-Uses global configuration tracking to avoid repeatedly exploring the same
-Hanoi configuration through different computation paths.
+Creates independent computation branches and explores them using BFS.
+Global configuration tracking prevents duplicate exploration.
+Breadth-first scheduling guarantees the first accepted Hanoi solution is shortest.
 """
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 
 from hanoi import HanoiPuzzle
@@ -33,17 +34,17 @@ class ComputationBranch:
 
 class NTMExplorer:
     """
-    Explore Hanoi computation branches with depth-first search.
+    Explore all nondeterministic legal-move choices using BFS scheduling.
 
-    global_visited ensures that each disk configuration is scheduled for
-    expansion at most once. This is valid for Hanoi because the disk
-    arrangement completely determines the legal next moves.
+    Each unique Hanoi configuration is scheduled at most once. Because BFS
+    explores paths in increasing move-count order, the first ACCEPT branch
+    is guaranteed to be a shortest solution.
     """
 
     def __init__(self, disk_count):
         self.initial_puzzle = HanoiPuzzle(disk_count)
         self.branches = {}
-        self.frontier = []
+        self.frontier = deque()
         self.next_branch_id = 0
 
         self.accepted_branch_id = None
@@ -55,8 +56,6 @@ class NTMExplorer:
 
         root = self.initial_puzzle.clone()
         root_key = configuration_key(root)
-
-        # Configurations are marked when discovered, not when later expanded.
         self.global_visited = {root_key}
 
         self._add_branch(
@@ -106,16 +105,15 @@ class NTMExplorer:
         return branch
 
     def step(self):
-        """Expand one pending branch and return the branch that was processed."""
+        """Process the oldest pending branch (one BFS step)."""
         if self.finished or not self.frontier:
             self.finished = True
             return None
 
-        branch_id = self.frontier.pop()
+        branch_id = self.frontier.popleft()
         branch = self.branches[branch_id]
         self.explored_count += 1
 
-        # A goal configuration accepts the entire NTM computation.
         if branch.puzzle.is_solved():
             branch.status = "ACCEPT"
             self.accepted_branch_id = branch_id
@@ -134,9 +132,9 @@ class NTMExplorer:
 
         branch.status = "EXPANDED"
 
-        # Reverse insertion makes the first listed legal move explored first
-        # when the frontier is used as a DFS stack.
-        for source, destination in reversed(legal_moves):
+        # BFS: append children in legal-move order; popleft() processes them
+        # in increasing path length, guaranteeing a shortest accepted path.
+        for source, destination in legal_moves:
             child_puzzle = branch.puzzle.clone()
             child_puzzle.apply_move(source, destination)
 
@@ -145,8 +143,6 @@ class NTMExplorer:
             child_visited = branch.visited | {child_key}
 
             if child_key in self.global_visited:
-                # This arrangement is already scheduled or has been explored.
-                # Keep a visible record, but do not put it on the DFS frontier.
                 self._add_branch(
                     parent_id=branch_id,
                     puzzle=child_puzzle,
@@ -158,9 +154,7 @@ class NTMExplorer:
                 )
                 continue
 
-            # Mark immediately so another branch cannot schedule it again.
             self.global_visited.add(child_key)
-
             self._add_branch(
                 parent_id=branch_id,
                 puzzle=child_puzzle,
@@ -175,7 +169,7 @@ class NTMExplorer:
         return branch
 
     def run_to_completion(self, max_steps=100000):
-        """Run DFS until acceptance, exhaustion, or the safety limit."""
+        """Run BFS until acceptance, exhaustion, or the safety limit."""
         steps = 0
 
         while not self.finished and steps < max_steps:
