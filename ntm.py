@@ -1,16 +1,17 @@
 """
 ntm.py
-A simple NTM-style computation tree explored using depth-first search.
-
-Each branch owns an independent Hanoi configuration and two tape copies.
-The DFS scheduler explores one branch at a time, while branching represents
-the machine's nondeterministic choice among legal moves.
+Creates independent computation branches and explores them using DFS.
 """
 
 from dataclasses import dataclass, field
 
 from hanoi import HanoiPuzzle
 from tape import Tape
+
+
+def configuration_key(puzzle):
+    """Convert a puzzle configuration into a hashable value."""
+    return tuple(tuple(puzzle.pegs[peg]) for peg in HanoiPuzzle.PEGS)
 
 
 @dataclass
@@ -23,10 +24,11 @@ class ComputationBranch:
     history: list = field(default_factory=list)
     move: tuple | None = None
     status: str = "PENDING"
+    visited: set = field(default_factory=set)
 
 
 class NTMExplorer:
-    """Explore Tower of Hanoi computation branches with a DFS scheduler."""
+    """Explore Hanoi computation branches with a depth-first scheduler."""
 
     def __init__(self, disk_count):
         self.initial_puzzle = HanoiPuzzle(disk_count)
@@ -37,15 +39,19 @@ class NTMExplorer:
         self.explored_count = 0
         self.rejected_count = 0
         self.finished = False
+
+        root = self.initial_puzzle.clone()
         self._add_branch(
             parent_id=None,
-            puzzle=self.initial_puzzle.clone(),
+            puzzle=root,
             history=[],
             move=None,
+            visited={configuration_key(root)},
         )
 
-    def _add_branch(self, parent_id, puzzle, history, move):
-        """Create a branch with its own two independent tapes."""
+    def _add_branch(self, parent_id, puzzle, history, move, visited,
+                    status="PENDING", enqueue=True):
+        """Create a branch with its own independent copies of both tapes."""
         branch_id = self.next_branch_id
         self.next_branch_id += 1
 
@@ -60,21 +66,24 @@ class NTMExplorer:
             tape2=tape2,
             history=history.copy(),
             move=move,
+            status=status,
+            visited=visited.copy(),
         )
         self.branches[branch_id] = branch
-        self.frontier.append(branch_id)
+
+        if enqueue:
+            self.frontier.append(branch_id)
+        if status == "REJECT":
+            self.rejected_count += 1
+
         return branch
 
     def step(self):
-        """
-        Expand one pending branch.
-        Returns the expanded branch, or None if no work remains.
-        """
+        """Expand one pending branch and return the branch that was processed."""
         if self.finished or not self.frontier:
             self.finished = True
             return None
 
-        # Last-in, first-out order gives depth-first exploration.
         branch_id = self.frontier.pop()
         branch = self.branches[branch_id]
         self.explored_count += 1
@@ -97,21 +106,35 @@ class NTMExplorer:
 
         branch.status = "EXPANDED"
 
-        # Add each legal next move as a separate computation branch.
-        # Reversing preserves the puzzle's listed move order under a LIFO DFS.
+        # Reverse insertion makes the first listed move explored first by DFS.
         for source, destination in reversed(legal_moves):
             child_puzzle = branch.puzzle.clone()
             child_puzzle.apply_move(source, destination)
 
-            move_text = f"{source}->{destination}"
-            child_history = branch.history + [move_text]
+            child_key = configuration_key(child_puzzle)
+            child_history = branch.history + [f"{source}->{destination}"]
+            child_visited = branch.visited | {child_key}
 
-            self._add_branch(
-                parent_id=branch_id,
-                puzzle=child_puzzle,
-                history=child_history,
-                move=(source, destination),
-            )
+            # Reject a path that repeats one of its earlier configurations.
+            # This prevents DFS from looping forever around Hanoi move cycles.
+            if child_key in branch.visited:
+                self._add_branch(
+                    parent_id=branch_id,
+                    puzzle=child_puzzle,
+                    history=child_history,
+                    move=(source, destination),
+                    visited=child_visited,
+                    status="REJECT",
+                    enqueue=False,
+                )
+            else:
+                self._add_branch(
+                    parent_id=branch_id,
+                    puzzle=child_puzzle,
+                    history=child_history,
+                    move=(source, destination),
+                    visited=child_visited,
+                )
 
         if not self.frontier:
             self.finished = True
@@ -119,7 +142,7 @@ class NTMExplorer:
         return branch
 
     def run_to_completion(self, max_steps=100000):
-        """Run DFS until a branch accepts or the search is exhausted."""
+        """Run DFS until acceptance, exhaustion, or the safety limit."""
         steps = 0
         while not self.finished and steps < max_steps:
             self.step()
@@ -131,7 +154,7 @@ class NTMExplorer:
         return self.get_result()
 
     def get_result(self):
-        """Return a summary of the current computation."""
+        """Return the current solution and search statistics."""
         accepted = self.accepted_branch_id is not None
         solution = []
 
@@ -149,7 +172,7 @@ class NTMExplorer:
         }
 
     def get_branch_tree(self):
-        """Return branch information suitable for displaying a tree."""
+        """Return branch data for the GUI's computation-tree display."""
         return [
             {
                 "branch_id": branch.branch_id,
@@ -163,5 +186,5 @@ class NTMExplorer:
         ]
 
     def get_branch(self, branch_id):
-        """Return a branch by ID."""
+        """Return a branch by its ID."""
         return self.branches.get(branch_id)
