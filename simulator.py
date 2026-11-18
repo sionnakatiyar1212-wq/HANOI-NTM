@@ -229,13 +229,21 @@ class HanoiNTMSimulator:
         else:
             self.status_label.config(text="Status: RUNNING")
 
+        total_created = len(self.explorer.branches)
+        solution_line = (
+            f"Solution length: {result['moves']} moves\n"
+            if result["accepted"]
+            else "Solution length: not found yet\n"
+        )
         self.stats_label.config(
             text=(
-                f"Explored configurations: {result['explored_branches']}\n"
-                f"Rejected branches: {result['rejected_branches']}\n"
+                solution_line
+                + f"Search effort (BFS steps): {result['explored_branches']}\n"
+                f"Total branches created: {total_created}\n"
                 f"Pruned duplicate branches: {result['pruned_branches']}\n"
+                f"Dead-end (REJECT) branches: {result['rejected_branches']}\n"
                 f"Pending branches: {result['pending_branches']}\n"
-                f"Unique configurations: {result['unique_configurations']}"
+                f"Unique configurations seen: {result['unique_configurations']}"
             )
         )
 
@@ -269,14 +277,14 @@ class HanoiNTMSimulator:
             self._auto_step()
 
     def _auto_step(self):
-        """Schedule the next automatic DFS step."""
+        """Schedule the next automatic BFS step."""
         if not self.auto_running or self.explorer.finished:
             self.auto_running = False
             return
 
         self.next_step()
         if self.auto_running and not self.explorer.finished:
-            self.root.after(50, self._auto_step)
+            self.root.after(100, self._auto_step)
 
     def stop(self):
         """Stop automatic exploration."""
