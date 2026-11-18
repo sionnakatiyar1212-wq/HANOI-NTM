@@ -197,10 +197,7 @@ class HanoiNTMSimulator:
         self.tape2_label.config(text=f"Tape 2 (history):  {tape2}")
 
     def _refresh_branch_tree(self):
-        """Refresh branch statuses and add newly created branches."""
-        for item in self.branch_tree.get_children():
-            self.branch_tree.delete(item)
-
+        """Update existing rows and insert only newly created branches."""
         for info in self.explorer.get_branch_tree():
             branch_id = info["branch_id"]
             parent_id = info["parent_id"]
@@ -208,13 +205,18 @@ class HanoiNTMSimulator:
 
             parent_text = "-" if parent_id is None else str(parent_id)
             move_text = "START" if move is None else f"{move[0]}->{move[1]}"
+            values = (parent_text, move_text, info["status"])
+            item_id = str(branch_id)
 
-            self.branch_tree.insert(
-                "",
-                "end",
-                iid=str(branch_id),
-                values=(parent_text, move_text, info["status"]),
-            )
+            if self.branch_tree.exists(item_id):
+                self.branch_tree.item(item_id, values=values)
+            else:
+                self.branch_tree.insert(
+                    "",
+                    "end",
+                    iid=item_id,
+                    values=values,
+                )
 
     def _update_results(self):
         """Update the machine status, statistics, and solution."""
@@ -274,7 +276,7 @@ class HanoiNTMSimulator:
 
         self.next_step()
         if self.auto_running and not self.explorer.finished:
-            self.root.after(500, self._auto_step)
+            self.root.after(50, self._auto_step)
 
     def stop(self):
         """Stop automatic exploration."""
