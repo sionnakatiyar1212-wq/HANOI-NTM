@@ -229,9 +229,11 @@ class HanoiNTMSimulator:
 
         self.stats_label.config(
             text=(
-                f"Explored branches: {result['explored_branches']}\n"
+                f"Explored configurations: {result['explored_branches']}\n"
                 f"Rejected branches: {result['rejected_branches']}\n"
-                f"Pending branches: {result['pending_branches']}"
+                f"Pruned duplicate branches: {result['pruned_branches']}\n"
+                f"Pending branches: {result['pending_branches']}\n"
+                f"Unique configurations: {result['unique_configurations']}"
             )
         )
 
