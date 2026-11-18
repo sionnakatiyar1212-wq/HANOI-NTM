@@ -8,7 +8,7 @@ The project is written in Python and uses Tkinter for its graphical interface.
 
 HANOI-NTM demonstrates how a machine can explore multiple possible computation paths. At each puzzle configuration, every legal move creates a separate computation branch. Each branch has its own puzzle configuration, two tapes, and move history.
 
-A depth-first search (DFS) scheduler explores the branches one at a time. The scheduler is deterministic; the branching structure represents the machine's nondeterministic choices.
+A breadth-first search (BFS) scheduler explores branches in increasing path length. The scheduler is deterministic; the branching structure represents the machine's nondeterministic choices. BFS ensures that the first accepting branch is a shortest solution.
 
 The machine accepts when at least one branch reaches the goal configuration, where all disks are on peg C.
 
@@ -18,8 +18,8 @@ The machine accepts when at least one branch reaches the goal configuration, whe
 - Three pegs: A, B, and C.
 - Two independent tapes for every computation branch.
 - Branch creation for each legal move.
-- DFS-based branch exploration.
-- Detection of repeated configurations along a branch to prevent endless cycles.
+- BFS-based branch exploration that finds a shortest solution.
+- Global duplicate-configuration detection to avoid exploring the same puzzle state repeatedly.
 - ACCEPT and REJECT branch statuses.
 - Graphical display of the puzzle, tapes, computation branches, and results.
 - Manual step-by-step and automatic execution controls.
@@ -43,7 +43,7 @@ HANOI-NTM/
 | `main.py` | Entry point; launches the application. |
 | `tape.py` | Implements a tape with read, write, move, load, and clone operations. |
 | `hanoi.py` | Implements the Hanoi puzzle, legal moves, goal test, and configuration copying. |
-| `ntm.py` | Creates independent computation branches and explores them using DFS. |
+| `ntm.py` | Creates independent computation branches and explores them using BFS. |
 | `simulator.py` | Builds the Tkinter graphical interface and connects the other modules. |
 | `README.md` | Project documentation and instructions. |
 
@@ -67,12 +67,12 @@ When a branch creates children, each child receives its own puzzle copy and its 
 2. The initial configuration places every disk on peg A.
 3. The machine finds all legal moves from the current configuration.
 4. Each legal move creates a separate child computation branch.
-5. The DFS scheduler explores pending branches using a stack.
+5. The BFS scheduler explores pending branches using a queue.
 6. A branch that reaches the goal is marked **ACCEPT**.
-7. A branch with no legal moves, or one that repeats a configuration already on its path, is marked **REJECT**.
+7. A configuration already discovered elsewhere is marked **PRUNED** and is not explored again. A branch with no legal moves is marked **REJECT**.
 8. The machine accepts when one branch reaches the goal. If the search space is exhausted without an accepting branch, it rejects.
 
-The repeated-configuration check is a practical cycle-prevention rule for this finite puzzle search.
+The global repeated-configuration check is valid here because a disk arrangement fully determines all legal future moves.
 
 ## Tower of Hanoi rules
 
@@ -93,9 +93,9 @@ For n disks, the minimum number of moves in a standard Tower of Hanoi solution i
 - **Computation branch:** One independent path through the computation tree.
 - **Acceptance:** At least one branch reaches the goal state.
 - **Rejection:** A branch cannot continue successfully.
-- **DFS scheduler:** A stack-based method used by this simulator to choose which pending branch to explore next.
+- **BFS scheduler:** A queue-based method used by this simulator to explore shorter paths before longer ones, guaranteeing a minimum-move solution.
 
-This is an educational NTM-style simulator for a finite puzzle. DFS is the simulator's exploration strategy; it is not itself nondeterminism.
+This is an educational NTM-style simulator for a finite puzzle. BFS is the simulator's exploration strategy; it is not itself nondeterminism.
 
 ## Requirements
 
